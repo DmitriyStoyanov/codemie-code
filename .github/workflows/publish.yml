@@ -22,6 +22,13 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      - name: Configure npm authentication
+        run: |
+          cat > .npmrc << EOF
+          //registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}
+          registry=https://registry.npmjs.org/
+          EOF
+
       - name: Install dependencies
         run: npm ci
 
