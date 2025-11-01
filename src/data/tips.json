@@ -1,0 +1,118 @@
+[
+  {
+    "message": "List all available agents and their installation status",
+    "command": "codemie list"
+  },
+  {
+    "message": "Show only installed agents",
+    "command": "codemie list --installed"
+  },
+  {
+    "message": "Check system health, dependencies, and AI configuration",
+    "command": "codemie doctor"
+  },
+  {
+    "message": "Run CodeMie Code assistant in current directory",
+    "command": "codemie run codemie-code"
+  },
+  {
+    "message": "Run Claude Code agent (if installed)",
+    "command": "codemie run claude"
+  },
+  {
+    "message": "Start assistant in a specific project directory",
+    "command": "codemie run codemie-code --cwd /path/to/project"
+  },
+  {
+    "message": "Install Aider - AI pair programming assistant",
+    "command": "codemie install aider"
+  },
+  {
+    "message": "Install Codex - OpenAI coding assistant",
+    "command": "codemie install codex"
+  },
+  {
+    "message": "Uninstall an agent you no longer need",
+    "command": "codemie uninstall <agent-name>"
+  },
+  {
+    "message": "Enable debug mode to see detailed logs and tool execution",
+    "command": "CODEMIE_DEBUG=true codemie run codemie-code"
+  },
+  {
+    "message": "Configure CodeMie with your AI provider",
+    "command": "export CODEMIE_BASE_URL=https://your-ai-proxy.com CODEMIE_AUTH_TOKEN=sk-..."
+  },
+  {
+    "message": "Configure using Anthropic-specific variables (advanced)",
+    "command": "export ANTHROPIC_BASE_URL=https://api.anthropic.com ANTHROPIC_AUTH_TOKEN=sk-..."
+  },
+  {
+    "message": "Configure using OpenAI-specific variables (advanced)",
+    "command": "export OPENAI_BASE_URL=https://api.openai.com/v1 OPENAI_API_KEY=sk-..."
+  },
+  {
+    "message": "Override model for specific run (Anthropic)",
+    "command": "ANTHROPIC_MODEL=claude-opus-4 codemie run codemie-code"
+  },
+  {
+    "message": "Override model for specific run (OpenAI)",
+    "command": "OPENAI_MODEL=gpt-4-turbo codemie run codemie-code"
+  },
+  {
+    "message": "Set model globally across all runs",
+    "command": "export CODEMIE_MODEL=claude-4-5-sonnet"
+  },
+  {
+    "message": "Enable MCP servers for extended functionality",
+    "command": "CODEMIE_MCP_SERVERS=filesystem,cli-mcp-server codemie run codemie-code"
+  },
+  {
+    "message": "Configure filesystem MCP server with specific paths",
+    "command": "FILE_PATHS=/project1,/project2 CODEMIE_MCP_SERVERS=filesystem codemie run"
+  },
+  {
+    "message": "Increase timeout for long-running AI requests",
+    "command": "CODEMIE_TIMEOUT=600 codemie run codemie-code"
+  },
+  {
+    "message": "Type 'clear' in interactive mode to reset conversation history"
+  },
+  {
+    "message": "Type 'exit' in interactive mode to quit the assistant"
+  },
+  {
+    "message": "CodeMie Code has filesystem, git, and command line tools built-in"
+  },
+  {
+    "message": "Use doctor command to troubleshoot configuration issues",
+    "command": "codemie doctor"
+  },
+  {
+    "message": "Provider is auto-detected from model name (claude=Anthropic, gpt=OpenAI)"
+  },
+  {
+    "message": "All agents support the same generic env vars (CODEMIE_BASE_URL, CODEMIE_AUTH_TOKEN, etc.)"
+  },
+  {
+    "message": "MCP servers add capabilities like file operations and IDE integrations"
+  },
+  {
+    "message": "Copy text: Hold Shift while selecting with mouse"
+  },
+  {
+    "message": "Copy text on macOS: Hold Option/Alt while selecting with mouse"
+  },
+  {
+    "message": "Paste text: Use Cmd+V (macOS) or Ctrl+Shift+V (Linux/Windows)"
+  },
+  {
+    "message": "Some terminals require Fn key modifier for text selection"
+  },
+  {
+    "message": "iTerm2 users: Option+Mouse drag to select and copy text"
+  },
+  {
+    "message": "Right-click paste works in most terminal emulators"
+  }
+]

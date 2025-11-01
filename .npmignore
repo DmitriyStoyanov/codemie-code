@@ -1,0 +1,19 @@
+# Source files
+src/
+tsconfig.json
+
+# Tests
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Development files
+.env.example
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# CI
+.github/
