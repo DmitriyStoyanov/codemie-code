@@ -17,8 +17,10 @@
   - [Core Commands](#core-commands)
   - [Agent Shortcuts](#agent-shortcuts)
   - [Configuration Commands](#configuration-commands)
+  - [Profile Management Commands](#profile-management-commands)
 - [Configuration](#configuration)
   - [Setup Wizard (Recommended)](#setup-wizard-recommended)
+  - [Multi-Provider Profiles](#multi-provider-profiles)
   - [Supported Providers](#supported-providers)
   - [Manual Configuration](#manual-configuration)
   - [Model Compatibility](#model-compatibility)
@@ -34,6 +36,7 @@
   - [CodeMie Native (Built-in)](#codemie-native-built-in)
   - [Claude Code](#claude-code)
   - [Codex](#codex)
+  - [Gemini CLI](#gemini-cli)
 - [Troubleshooting](#troubleshooting)
   - [Command Not Found](#command-not-found)
   - [Configuration Issues](#configuration-issues)
@@ -54,9 +57,10 @@ codemie [COMMAND] [OPTIONS]
 codemie-code [MESSAGE|--task TASK] [OPTIONS]
 codemie-claude [-p MESSAGE] [OPTIONS]
 codemie-codex [MESSAGE|--task TASK] [OPTIONS]
+codemie-gemini [-m MODEL] [-p MESSAGE] [OPTIONS]
 ```
 
-AI/Run CodeMie CLI is a professional, unified CLI tool for installing, configuring, and running multiple AI coding agents from a single interface. It includes a built-in LangGraph-based agent (CodeMie Native) and supports external agents like Claude Code and Codex.
+AI/Run CodeMie CLI is a professional, unified CLI tool for installing, configuring, and running multiple AI coding agents from a single interface. It includes a built-in LangGraph-based agent (CodeMie Native) and supports external agents like Claude Code, Codex, and Gemini CLI.
 
 ## Quick Start
 
@@ -67,8 +71,29 @@ npm install -g @codemieai/code
 # 2. Setup (interactive wizard)
 codemie setup
 
-# 3. Start coding with built-in agent
+# 3. View supported agents
+codemie list
+
+# 4. Install external agents (optional)
+codemie install claude   # Claude Code
+codemie install codex    # OpenAI Codex
+codemie install gemini   # Google Gemini CLI
+
+# 5. Manage profiles (multi-provider support)
+codemie profile list             # List all profiles
+codemie profile switch work      # Switch to different profile
+codemie setup                    # Add new profile or update existing
+
+# 6. Start coding with built-in agent
 codemie-code "Review my code for bugs"
+
+# 7. Use external agents
+codemie-claude "Refactor this function"
+codemie-codex "Add unit tests"
+codemie-gemini "Optimize performance"
+
+# 8. Use specific profile for a task
+codemie-code --profile work "Deploy to production"
 ```
 
 ## Installation
@@ -127,8 +152,8 @@ codemie install codex
 codemie-claude -p "Review my API code"
 codemie-codex --task "Generate unit tests"
 
-# Or run through main CLI
-codemie run claude --task "Fix security issues"
+# Direct shortcuts are the recommended way
+codemie-claude -p "Fix security issues"
 ```
 
 ## Commands
@@ -137,11 +162,11 @@ codemie run claude --task "Fix security issues"
 
 ```bash
 codemie setup                    # Interactive configuration wizard
+codemie profile <command>        # Manage provider profiles
 codemie auth <command>           # Manage SSO authentication
 codemie list                     # List all available agents
 codemie install <agent>          # Install an agent
 codemie uninstall <agent>        # Uninstall an agent
-codemie run <agent> [args...]    # Run an agent
 codemie doctor                   # Health check and diagnostics
 codemie config <action>          # Manage configuration
 codemie version                  # Show version information
@@ -161,19 +186,36 @@ codemie-code health              # Health check
 codemie-claude                   # Claude Code agent (interactive)
 codemie-claude -p "message"      # Claude Code agent (print mode)
 codemie-codex [message]          # Codex agent
+codemie-gemini                   # Gemini CLI agent
 
-# Configuration overrides
+# Configuration overrides (model, API key, base URL, timeout)
 codemie-claude --model claude-4-5-sonnet --api-key your-key
-codemie-codex --model gpt-4o --provider openai
+codemie-codex --model gpt-4.1 --base-url https://api.openai.com/v1
+codemie-gemini --model gemini-2.0-flash-exp
+
+# Profile selection (profiles contain provider + all settings)
+codemie-code --profile work-litellm "task"
+codemie-claude --profile personal-openai -p "message"
+codemie-gemini --profile lite --model gemini-2.5-flash  # Use LiteLLM proxy
 ```
 
 ### Configuration Commands
 
 ```bash
-codemie config list              # Show all configuration
-codemie config get <key>         # Get specific value
-codemie config set <key> <value> # Set configuration value
-codemie config reset             # Reset to defaults
+codemie config show              # Show current configuration with sources
+codemie config list              # List all available parameters
+codemie config test              # Test connection with current configuration
+codemie config init              # Initialize project-specific configuration
+```
+
+### Profile Management Commands
+
+```bash
+codemie profile list             # List all provider profiles
+codemie profile switch <name>    # Switch to a different profile
+codemie profile show [name]      # Show profile details (defaults to active)
+codemie profile delete <name>    # Delete a profile
+codemie profile rename <old> <new> # Rename a profile
 ```
 
 ## Configuration
@@ -192,9 +234,104 @@ The wizard will:
 - Fetch available models in real-time
 - Save configuration to `~/.codemie/config.json`
 
+**Multi-Provider Support**: If you already have profiles configured, the wizard will offer to:
+- Add a new profile (prompts for unique name)
+- Update an existing profile (select from list)
+- Cancel without changes
+
+This ensures you can configure multiple providers (work, personal, enterprise SSO) without losing existing configurations.
+
+### Multi-Provider Profiles
+
+CodeMie CLI supports multiple provider profiles, allowing you to:
+- Configure different providers for different contexts (work, personal, etc.)
+- Switch between profiles with a single command
+- Keep all configurations without overwriting
+
+#### Creating Multiple Profiles
+
+```bash
+# First profile - work account with LiteLLM
+codemie setup
+# → Choose: Add a new profile
+# → Name: "work-litellm"
+# → Provider: LiteLLM
+# → Configure credentials...
+
+# Second profile - personal OpenAI account
+codemie setup
+# → Choose: Add a new profile
+# → Name: "personal-openai"
+# → Provider: OpenAI
+# → Configure credentials...
+
+# Third profile - enterprise SSO
+codemie setup
+# → Choose: Add a new profile
+# → Name: "enterprise-sso"
+# → Provider: CodeMie SSO
+# → Authenticate via SSO...
+```
+
+#### Using Profiles
+
+```bash
+# List all profiles (shows active profile with ●)
+codemie profile list
+# Output:
+# ● work-litellm (litellm) - claude-4-5-sonnet
+# ○ personal-openai (openai) - gpt-4.1
+# ○ enterprise-sso (ai-run-sso) - claude-4-5-sonnet
+
+# Switch active profile
+codemie profile switch personal-openai
+
+# Use active profile (default behavior)
+codemie-code "analyze this code"
+
+# Override with specific profile for one command
+codemie-claude --profile work-litellm "review PR"
+codemie-codex --profile personal-openai "generate tests"
+
+# Show profile details
+codemie profile show work-litellm
+```
+
+#### Profile Configuration File
+
+Profiles are stored in `~/.codemie/config.json`:
+
+```json
+{
+  "version": 2,
+  "activeProfile": "work-litellm",
+  "profiles": {
+    "work-litellm": {
+      "name": "work-litellm",
+      "provider": "litellm",
+      "baseUrl": "https://litellm.company.com",
+      "apiKey": "sk-***",
+      "model": "claude-4-5-sonnet",
+      "timeout": 300
+    },
+    "personal-openai": {
+      "name": "personal-openai",
+      "provider": "openai",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "sk-***",
+      "model": "gpt-4.1",
+      "timeout": 300
+    }
+  }
+}
+```
+
+**Legacy Configuration**: If you have an existing single-provider config, it will automatically migrate to a profile named "default" on first use.
+
 ### Supported Providers
 
 - **ai-run-sso** - AI/Run CodeMie SSO (unified enterprise gateway)
+- **gemini** - Google Gemini API (direct access)
 - **openai** - OpenAI API
 - **azure** - Azure OpenAI
 - **bedrock** - AWS Bedrock
@@ -214,6 +351,10 @@ export CODEMIE_PROVIDER="litellm"
 # Provider-specific
 export OPENAI_API_KEY="your-openai-key"
 export OPENAI_BASE_URL="https://api.openai.com/v1"
+
+# Gemini-specific
+export GEMINI_API_KEY="your-gemini-key"
+export GEMINI_MODEL="gemini-2.5-flash"
 ```
 
 #### Configuration File
@@ -234,8 +375,9 @@ Location: `~/.codemie/config.json`
 
 AI/Run CodeMie CLI automatically validates model compatibility:
 
-- **Codex**: OpenAI models only (gpt-4, gpt-4o, gpt-5, etc.)
+- **Codex**: OpenAI models only (gpt-4, gpt-4.1, gpt-5, etc.)
 - **Claude**: Both Claude and GPT models
+- **Gemini CLI**: Gemini models only (gemini-2.5-flash, gemini-2.5-pro, gemini-1.5-pro, etc.)
 - **CodeMie Native**: All supported models
 
 When incompatible models are detected, AI/Run CodeMie CLI will:
@@ -370,10 +512,14 @@ codemie-claude -p "Refactor this component to use React hooks"
 ### Configuration Examples
 
 ```bash
-# Setup with different providers
-codemie config set provider openai
-codemie config set model gpt-4o
-codemie config set apiKey sk-your-key
+# View current configuration with sources
+codemie config show
+
+# Test connection
+codemie config test
+
+# Initialize project-specific overrides
+codemie config init
 
 # Temporary model override
 codemie-claude --model claude-4-5-sonnet -p "Explain this algorithm"
@@ -382,14 +528,53 @@ codemie-claude --model claude-4-5-sonnet -p "Explain this algorithm"
 codemie-code --debug --task "analyze performance issues"
 ```
 
+### Multi-Provider Workflow Examples
+
+```bash
+# Scenario: Developer with work and personal accounts
+
+# Setup work profile with enterprise LiteLLM
+codemie setup
+# → Name: "work"
+# → Provider: LiteLLM
+# → URL: https://litellm.company.com
+# → Model: claude-4-5-sonnet
+
+# Setup personal profile with OpenAI
+codemie setup
+# → Name: "personal"
+# → Provider: OpenAI
+# → Model: gpt-4.1
+
+# List profiles to verify
+codemie profile list
+# ● work (litellm) - claude-4-5-sonnet
+# ○ personal (openai) - gpt-4.1
+
+# Use work profile during work hours
+codemie-code "review company codebase"
+
+# Switch to personal for side projects
+codemie profile switch personal
+codemie-code "help with my open source project"
+
+# Or use specific profile without switching
+codemie-claude --profile work "analyze security"
+codemie-codex --profile personal "generate tests"
+
+# Update work profile when credentials rotate
+codemie setup
+# → Choose: Update existing profile
+# → Select: work
+# → Update credentials...
+```
+
 ### Advanced Usage
 
 ```bash
-# Run specific agent versions
-codemie run claude --version latest
-
-# Pass custom arguments
+# Pass custom arguments to agents
 codemie-codex --temperature 0.1 --max-tokens 2000 "Generate clean code"
+codemie-claude -p "Review this code" --context large
 
 # Health checks
 codemie doctor                   # Full system check
@@ -442,6 +627,41 @@ OpenAI's code generation assistant optimized for completion tasks.
 - Code explanation and documentation
 - **Requires OpenAI-compatible models only**
 
+### Gemini CLI
+
+Google's Gemini AI coding assistant with advanced code understanding.
+
+**Installation:** `codemie install gemini`
+
+**Requirements:**
+- **Requires a valid Google Gemini API key** from https://aistudio.google.com/apikey
+- **Requires Gemini-compatible models only** (gemini-2.5-flash, gemini-2.5-pro, etc.)
+- LiteLLM or AI-Run SSO API keys will **not** work with Gemini CLI
+
+**Setup:**
+```bash
+# Configure Gemini with dedicated API key
+codemie setup
+# Select: "Google Gemini (Direct API Access)"
+# Enter your Gemini API key from https://aistudio.google.com/apikey
+
+# Or use environment variable
+export GEMINI_API_KEY="your-gemini-api-key-here"
+```
+
+**Features:**
+- Advanced code generation and analysis
+- Multi-model support (Gemini 2.5 Flash, Pro, etc.)
+- Project-aware context with directory inclusion
+- JSON and streaming JSON output formats
+
+**Usage:**
+```bash
+codemie-gemini                          # Interactive mode
+codemie-gemini -m gemini-2.5-flash      # Specify model
+codemie-gemini -p "your prompt"         # Non-interactive mode
+```
+
 ## Troubleshooting
 
 ### Command Not Found
@@ -462,10 +682,13 @@ npm list -g @codemieai/code
 codemie setup
 
 # Check current config
+codemie config show
+
+# View available parameters
 codemie config list
 
-# Reset if needed
-codemie config reset
+# Test connection
+codemie config test
 ```
 
 ### Connection Problems
@@ -499,10 +722,10 @@ codemie install claude
 
 When you see "Model not compatible" errors:
 
-1. Check your configured model: `codemie config get model`
+1. Check your configured model: `codemie config show`
 2. Run the agent to see compatible options
-3. Set a compatible model: `codemie config set model gpt-4o`
-4. Or override temporarily: `codemie-codex --model gpt-4o`
+3. Update your profile: `codemie setup` (choose "Update existing profile")
+4. Or override temporarily: `codemie-codex --model gpt-4.1`
 
 ## Development
 

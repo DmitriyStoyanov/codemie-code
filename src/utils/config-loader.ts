@@ -3,54 +3,34 @@ import * as path from 'path';
 import * as os from 'os';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
+import {
+  CodeMieConfigOptions,
+  ProviderProfile,
+  MultiProviderConfig,
+  CodeMieIntegrationInfo,
+  ConfigWithSource,
+  isMultiProviderConfig,
+  isLegacyConfig
+} from '../env/types.js';
 
-/**
- * Minimal CodeMie integration info for config storage
- */
-export interface CodeMieIntegrationInfo {
-  id: string;
-  alias: string;
-}
-
-/**
- * Configuration options for CodeMie Code
- */
-export interface CodeMieConfigOptions {
-  provider?: string;
-  baseUrl?: string;
-  apiKey?: string;
-  model?: string;
-  timeout?: number;
-  debug?: boolean;
-  allowedDirs?: string[];
-  ignorePatterns?: string[];
-
-  // SSO-specific fields
-  authMethod?: 'manual' | 'sso';
-  codeMieUrl?: string;      // Original CodeMie URL entered by user
-  codeMieIntegration?: CodeMieIntegrationInfo; // Selected CodeMie integration for ai-run-sso
-  ssoConfig?: {
-    apiUrl?: string;        // Resolved API endpoint from config.js
-    cookiesEncrypted?: string; // Encrypted authentication cookies (deprecated - use credential store)
-  };
-}
-
-/**
- * Configuration with source tracking
- */
-export interface ConfigWithSource {
-  value: any;
-  source: 'default' | 'global' | 'project' | 'env' | 'cli';
-}
+// Re-export for backward compatibility
+export type { CodeMieConfigOptions, CodeMieIntegrationInfo, ConfigWithSource };
 
 /**
  * Unified configuration loader with priority system:
  * CLI args > Env vars > Project config > Global config > Defaults
+ *
+ * Supports both:
+ * - Legacy single-provider config (version 1)
+ * - Multi-provider profiles (version 2)
  */
 export class ConfigLoader {
   private static GLOBAL_CONFIG_DIR = path.join(os.homedir(), '.codemie');
   private static GLOBAL_CONFIG = path.join(ConfigLoader.GLOBAL_CONFIG_DIR, 'config.json');
   private static LOCAL_CONFIG = '.codemie/config.json';
+
+  // Cache for multi-provider config
+  private static multiProviderCache: MultiProviderConfig | null = null;
 
   /**
    * Load configuration with proper priority:
@@ -62,6 +42,8 @@ export class ConfigLoader {
   ): Promise<CodeMieConfigOptions> {
     // 5. Built-in defaults (lowest priority)
     const config: CodeMieConfigOptions = {
+      name: 'default',
+      provider: 'openai',
       timeout: 300,
       debug: false,
       allowedDirs: [],
@@ -69,7 +51,8 @@ export class ConfigLoader {
     };
 
     // 4. Global config (~/.codemie/config.json)
-    const globalConfig = await this.loadJsonConfig(this.GLOBAL_CONFIG);
+    // Load from active profile if multi-provider, otherwise load as-is
+    const globalConfig = await this.loadGlobalConfigProfile(cliOverrides?.name);
     Object.assign(config, this.removeUndefined(globalConfig));
 
     // 3. Project-local config (.codemie/config.json)
@@ -94,6 +77,34 @@ export class ConfigLoader {
     }
 
     return config;
+  }
+
+  /**
+   * Load global config and extract active profile if multi-provider
+   */
+  private static async loadGlobalConfigProfile(profileName?: string): Promise<Partial<CodeMieConfigOptions>> {
+    const rawConfig = await this.loadJsonConfig(this.GLOBAL_CONFIG);
+
+    // Check if multi-provider config
+    if (isMultiProviderConfig(rawConfig)) {
+      this.multiProviderCache = rawConfig;
+      const profile = profileName || rawConfig.activeProfile;
+
+      if (!rawConfig.profiles[profile]) {
+        throw new Error(
+          `Profile "${profile}" not found. Available profiles: ${Object.keys(rawConfig.profiles).join(', ')}`
+        );
+      }
+
+      return rawConfig.profiles[profile];
+    }
+
+    // Legacy single-provider config
+    if (isLegacyConfig(rawConfig)) {
+      return rawConfig;
+    }
+
+    return {};
   }
 
   /**
@@ -174,6 +185,7 @@ export class ConfigLoader {
 
   /**
    * Save configuration to global config file
+   * Supports both legacy and multi-provider formats
    */
   static async saveGlobalConfig(config: Partial<CodeMieConfigOptions>): Promise<void> {
     await fs.mkdir(this.GLOBAL_CONFIG_DIR, { recursive: true });
@@ -182,6 +194,167 @@ export class ConfigLoader {
       JSON.stringify(config, null, 2),
       'utf-8'
     );
+    // Clear cache
+    this.multiProviderCache = null;
+  }
+
+  /**
+   * Load multi-provider config (migrates from legacy if needed)
+   */
+  static async loadMultiProviderConfig(): Promise<MultiProviderConfig> {
+    const rawConfig = await this.loadJsonConfig(this.GLOBAL_CONFIG);
+
+    // Already multi-provider format
+    if (isMultiProviderConfig(rawConfig)) {
+      return rawConfig;
+    }
+
+    // Legacy format - migrate to multi-provider
+    if (isLegacyConfig(rawConfig)) {
+      const defaultProfile: ProviderProfile = {
+        name: 'default',
+        ...rawConfig
+      };
+
+      return {
+        version: 2,
+        activeProfile: 'default',
+        profiles: {
+          default: defaultProfile
+        }
+      };
+    }
+
+    // Empty config - return empty multi-provider structure
+    return {
+      version: 2,
+      activeProfile: 'default',
+      profiles: {}
+    };
+  }
+
+  /**
+   * Save multi-provider config
+   */
+  static async saveMultiProviderConfig(config: MultiProviderConfig): Promise<void> {
+    await this.saveGlobalConfig(config as any);
+  }
+
+  /**
+   * Add or update a profile
+   */
+  static async saveProfile(profileName: string, profile: ProviderProfile): Promise<void> {
+    const config = await this.loadMultiProviderConfig();
+
+    // Set profile name
+    profile.name = profileName;
+
+    // Add or update profile
+    config.profiles[profileName] = profile;
+
+    // If this is the first profile, make it active
+    if (Object.keys(config.profiles).length === 1) {
+      config.activeProfile = profileName;
+    }
+
+    await this.saveMultiProviderConfig(config);
+  }
+
+  /**
+   * Delete a profile
+   */
+  static async deleteProfile(profileName: string): Promise<void> {
+    const config = await this.loadMultiProviderConfig();
+
+    if (!config.profiles[profileName]) {
+      throw new Error(`Profile "${profileName}" not found`);
+    }
+
+    // Can't delete the active profile if it's the only one
+    if (config.activeProfile === profileName && Object.keys(config.profiles).length === 1) {
+      throw new Error('Cannot delete the only profile. Add another profile first.');
+    }
+
+    delete config.profiles[profileName];
+
+    // If we deleted the active profile, switch to another one
+    if (config.activeProfile === profileName) {
+      config.activeProfile = Object.keys(config.profiles)[0];
+    }
+
+    await this.saveMultiProviderConfig(config);
+  }
+
+  /**
+   * Switch active profile
+   */
+  static async switchProfile(profileName: string): Promise<void> {
+    const config = await this.loadMultiProviderConfig();
+
+    if (!config.profiles[profileName]) {
+      throw new Error(
+        `Profile "${profileName}" not found. Available profiles: ${Object.keys(config.profiles).join(', ')}`
+      );
+    }
+
+    config.activeProfile = profileName;
+    await this.saveMultiProviderConfig(config);
+  }
+
+  /**
+   * List all profiles
+   */
+  static async listProfiles(): Promise<{ name: string; active: boolean; profile: ProviderProfile }[]> {
+    const config = await this.loadMultiProviderConfig();
+
+    return Object.entries(config.profiles).map(([name, profile]) => ({
+      name,
+      active: name === config.activeProfile,
+      profile
+    }));
+  }
+
+  /**
+   * Get a specific profile
+   */
+  static async getProfile(profileName: string): Promise<ProviderProfile | null> {
+    const config = await this.loadMultiProviderConfig();
+    return config.profiles[profileName] || null;
+  }
+
+  /**
+   * Rename a profile
+   */
+  static async renameProfile(oldName: string, newName: string): Promise<void> {
+    const config = await this.loadMultiProviderConfig();
+
+    if (!config.profiles[oldName]) {
+      throw new Error(`Profile "${oldName}" not found`);
+    }
+
+    if (config.profiles[newName]) {
+      throw new Error(`Profile "${newName}" already exists`);
+    }
+
+    // Copy profile with new name
+    const profile = { ...config.profiles[oldName], name: newName };
+    config.profiles[newName] = profile;
+    delete config.profiles[oldName];
+
+    // Update active profile if needed
+    if (config.activeProfile === oldName) {
+      config.activeProfile = newName;
+    }
+
+    await this.saveMultiProviderConfig(config);
+  }
+
+  /**
+   * Get active profile name
+   */
+  static async getActiveProfileName(): Promise<string | null> {
+    const config = await this.loadMultiProviderConfig();
+    return config.activeProfile || null;
   }
 
   /**
@@ -395,6 +568,33 @@ export class ConfigLoader {
   }
 
   /**
+   * Set multi-provider environment variables (OpenAI, Anthropic, Gemini)
+   * Used by LiteLLM and AI-Run SSO for maximum compatibility
+   */
+  private static setMultiProviderEnvVars(
+    env: Record<string, string>,
+    config: CodeMieConfigOptions
+  ): void {
+    if (config.baseUrl) {
+      env.OPENAI_BASE_URL = config.baseUrl;
+      env.ANTHROPIC_BASE_URL = config.baseUrl;
+      // LiteLLM Gemini integration requires GOOGLE_GEMINI_BASE_URL
+      // See: https://docs.litellm.ai/docs/tutorials/litellm_gemini_cli
+      env.GOOGLE_GEMINI_BASE_URL = config.baseUrl;
+    }
+    if (config.apiKey) {
+      env.OPENAI_API_KEY = config.apiKey;
+      env.ANTHROPIC_AUTH_TOKEN = config.apiKey;
+      env.GEMINI_API_KEY = config.apiKey;
+    }
+    if (config.model) {
+      env.OPENAI_MODEL = config.model;
+      env.ANTHROPIC_MODEL = config.model;
+      env.GEMINI_MODEL = config.model;
+    }
+  }
+
+  /**
    * Export provider-specific environment variables
    * (for passing to external agents like Claude Code, Codex)
    */
@@ -434,36 +634,23 @@ export class ConfigLoader {
       // AWS Bedrock configuration
       env.CLAUDE_CODE_USE_BEDROCK = '1';
       // AWS credentials should be set via AWS CLI or environment variables
+    } else if (provider === 'GEMINI') {
+      // Google Gemini API
+      // LiteLLM Gemini integration requires GOOGLE_GEMINI_BASE_URL
+      // See: https://docs.litellm.ai/docs/tutorials/litellm_gemini_cli
+      if (config.baseUrl) env.GOOGLE_GEMINI_BASE_URL = config.baseUrl;
+      if (config.apiKey) env.GEMINI_API_KEY = config.apiKey;
+      if (config.model) env.GEMINI_MODEL = config.model;
     } else if (provider === 'LITELLM') {
       // Generic LiteLLM proxy gateway
-      // LiteLLM can proxy for any model, so set both OpenAI and Anthropic env vars
-      if (config.baseUrl) {
-        env.OPENAI_BASE_URL = config.baseUrl;
-        env.ANTHROPIC_BASE_URL = config.baseUrl;
-      }
-      if (config.apiKey) {
-        env.OPENAI_API_KEY = config.apiKey;
-        env.ANTHROPIC_AUTH_TOKEN = config.apiKey;
-      }
-      if (config.model) {
-        env.OPENAI_MODEL = config.model;
-        env.ANTHROPIC_MODEL = config.model;
-      }
+      // LiteLLM can proxy for any model, so set OpenAI, Anthropic, and Gemini env vars
+      this.setMultiProviderEnvVars(env, config);
     } else if (provider === 'AI-RUN-SSO') {
       // CodeMie SSO authentication - credentials handled via credential store
-      // Set both OpenAI and Anthropic env vars for compatibility
-      if (config.baseUrl) {
-        env.OPENAI_BASE_URL = config.baseUrl;
-        env.ANTHROPIC_BASE_URL = config.baseUrl;
-      }
-      if (config.apiKey) {
-        env.OPENAI_API_KEY = config.apiKey;
-        env.ANTHROPIC_AUTH_TOKEN = config.apiKey;
-      }
-      if (config.model) {
-        env.OPENAI_MODEL = config.model;
-        env.ANTHROPIC_MODEL = config.model;
-      }
+      // Set OpenAI, Anthropic, and Gemini env vars for compatibility
+      this.setMultiProviderEnvVars(env, config);
+
+      // Add SSO-specific environment variables
       if (config.codeMieUrl) env.CODEMIE_URL = config.codeMieUrl;
       if (config.authMethod) env.CODEMIE_AUTH_METHOD = config.authMethod;
       if (config.codeMieIntegration?.id) env.CODEMIE_INTEGRATION_ID = config.codeMieIntegration.id;

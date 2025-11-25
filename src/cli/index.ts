@@ -4,7 +4,6 @@ import { Command } from 'commander';
 import { createListCommand } from './commands/list.js';
 import { createInstallCommand } from './commands/install.js';
 import { createUninstallCommand } from './commands/uninstall.js';
-import { createRunCommand } from './commands/run.js';
 import { createDoctorCommand } from './commands/doctor.js';
 import { createVersionCommand } from './commands/version.js';
 import { createSetupCommand } from './commands/setup.js';
@@ -13,6 +12,7 @@ import { createEnvCommand } from './commands/env.js';
 import { createAuthCommand } from './commands/auth.js';
 import { createToolsCommand } from './commands/tools.js';
 import { createWorkflowCommand } from './commands/workflow.js';
+import { createProfileCommand } from './commands/profile.js';
 import { FirstTimeExperience } from '../utils/first-time.js';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
@@ -40,13 +40,13 @@ program
 
 // Add commands
 program.addCommand(createSetupCommand());
+program.addCommand(createProfileCommand());
 program.addCommand(createAuthCommand());
 program.addCommand(createEnvCommand());
 program.addCommand(createConfigCommand());
 program.addCommand(createListCommand());
 program.addCommand(createInstallCommand());
 program.addCommand(createUninstallCommand());
-program.addCommand(createRunCommand());
 program.addCommand(createDoctorCommand());
 program.addCommand(createVersionCommand());
 program.addCommand(createToolsCommand());
