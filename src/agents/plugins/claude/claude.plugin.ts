@@ -1,13 +1,9 @@
 import { AgentMetadata } from '../../core/types.js';
 import { BaseAgentAdapter } from '../../core/BaseAgentAdapter.js';
-import { ClaudeMetricsAdapter } from './claude.metrics.js';
-import type { AgentMetricsSupport } from '../../core/metrics/types.js';
-import { ClaudeConversationsAdapter } from './claude.conversations.js';
-import type { AgentConversationsSupport } from './claude.conversations.js';
-import { ClaudeSessionAdapter } from './claude.session-adapter.js';
-import type { SessionAdapter } from '../../../providers/plugins/sso/session/adapters/base/BaseSessionAdapter.js';
-import { ClaudeLifecycleAdapter } from './claude.lifecycle-adapter.js';
-import type { SessionLifecycleAdapter } from '../../core/session/types.js';
+import { ClaudeSessionAdapter } from './claude.session.js';
+import type { SessionAdapter } from '../../core/session/BaseSessionAdapter.js';
+import { ClaudePluginInstaller } from './claude.plugin-installer.js';
+import type { BaseExtensionInstaller } from '../../core/extension/BaseExtensionInstaller.js';
 
 /**
  * Claude Code Plugin Metadata
@@ -22,9 +18,7 @@ export const ClaudePluginMetadata: AgentMetadata = {
 
   // Data paths (used by lifecycle hooks and analytics)
   dataPaths: {
-    home: '.claude',
-    sessions: 'projects',
-    user_prompts: 'history.jsonl'  // User prompt history
+    home: '.claude'
   },
 
   envMapping: {
@@ -78,35 +72,15 @@ export const ClaudePluginMetadata: AgentMetadata = {
  * Claude Code Adapter
  */
 export class ClaudePlugin extends BaseAgentAdapter {
-  private metricsAdapter: AgentMetricsSupport;
-  private conversationsAdapter: AgentConversationsSupport;
   private sessionAdapter: SessionAdapter;
-  private lifecycleAdapter: SessionLifecycleAdapter;
+  private extensionInstaller: BaseExtensionInstaller;
 
   constructor() {
     super(ClaudePluginMetadata);
-    // Pass metadata to metrics adapter to avoid duplication
-    this.metricsAdapter = new ClaudeMetricsAdapter('claude', ClaudePluginMetadata);
-    // Initialize conversations adapter
-    this.conversationsAdapter = new ClaudeConversationsAdapter();
     // Initialize session adapter with metadata for unified session sync
     this.sessionAdapter = new ClaudeSessionAdapter(ClaudePluginMetadata);
-    // Initialize lifecycle adapter for session transition detection
-    this.lifecycleAdapter = new ClaudeLifecycleAdapter();
-  }
-
-  /**
-   * Get metrics adapter for this agent
-   */
-  getMetricsAdapter(): AgentMetricsSupport {
-    return this.metricsAdapter;
-  }
-
-  /**
-   * Get conversations adapter for this agent
-   */
-  getConversationsAdapter(): AgentConversationsSupport {
-    return this.conversationsAdapter;
+    // Initialize extension installer with metadata (agent name from metadata)
+    this.extensionInstaller = new ClaudePluginInstaller(ClaudePluginMetadata);
   }
 
   /**
@@ -117,9 +91,10 @@ export class ClaudePlugin extends BaseAgentAdapter {
   }
 
   /**
-   * Provide lifecycle adapter for session transition detection
+   * Get extension installer for this agent
+   * Returns installer to handle plugin installation
    */
-  getLifecycleAdapter(): SessionLifecycleAdapter {
-    return this.lifecycleAdapter;
+  getExtensionInstaller(): BaseExtensionInstaller {
+    return this.extensionInstaller;
   }
 }
