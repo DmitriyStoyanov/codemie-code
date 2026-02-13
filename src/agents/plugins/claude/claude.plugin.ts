@@ -28,7 +28,7 @@ import {
  *
  * **UPDATE THIS WHEN BUMPING CLAUDE VERSION**
  */
-const CLAUDE_SUPPORTED_VERSION = '2.1.31';
+const CLAUDE_SUPPORTED_VERSION = '2.1.41';
 
 /**
  * Claude Code installer URLs
